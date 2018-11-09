@@ -8,9 +8,13 @@ public class Main {
         brawnMethod.addRowToPayMatrix(3, -2, 1, -5, 0);
         brawnMethod.addRowToPayMatrix(-4, 0, 6, 0, 5);
         brawnMethod.addRowToPayMatrix(2, 1, 5, 3, -1);
-        brawnMethod.printPayMatrix();
+        brawnMethod.printPayTable();
         System.out.println();
         brawnMethod.deleteDominatedStrategies();
-        brawnMethod.printPayMatrix();
+        brawnMethod.printPayTable();
+
+        brawnMethod.play(100);
+
+        brawnMethod.printGameTable();
     }
 }

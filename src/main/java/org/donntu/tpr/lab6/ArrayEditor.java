@@ -3,11 +3,11 @@ package org.donntu.tpr.lab6;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Cast {
+public class ArrayEditor {
     public static List<String> castToStringList(Object[] objects) {
         List<String> list = new ArrayList<String>();
-        for (int i = 0; i < objects.length; i++) {
-            list.add((String) objects[i]);
+        for (final Object object : objects) {
+            list.add((String) object);
         }
         return list;
     }
@@ -19,4 +19,5 @@ public class Cast {
         }
         return integers;
     }
+
 }
