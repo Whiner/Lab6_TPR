@@ -10,11 +10,15 @@ public class Main {
         brawnMethod.addRowToPayMatrix(2, 1, 5, 3, -1);
         brawnMethod.printPayTable();
         System.out.println();
-        brawnMethod.deleteDominatedStrategies();
-        brawnMethod.printPayTable();
-
+        System.out.println("Альфа = " + brawnMethod.getAlpha());
+        System.out.println("Бета = " + brawnMethod.getBeta());
         brawnMethod.play(100);
+        System.out.println();
+
 
         brawnMethod.printGameTable();
+
+        brawnMethod.printaResult();
+        brawnMethod.printbResult();
     }
 }

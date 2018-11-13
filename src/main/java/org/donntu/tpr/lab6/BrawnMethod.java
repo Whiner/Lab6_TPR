@@ -10,11 +10,76 @@ public class BrawnMethod {
     private PlayerTarget aTarget = PlayerTarget.MAX_PRIZE;
     private PlayerTarget bTarget = PlayerTarget.MIN_LOSSES;
     private Table<Integer, String, Double> gameTable = HashBasedTable.create();
+    private List<Double> aResult = new ArrayList<Double>();
+    private List<Double> bResult = new ArrayList<Double>();
     private int currentTurn;
     private int currIteration;
+    private int tourCount;
+
+    private Map<String, Integer> aLastStrategy = new HashMap<String, Integer>();
+    private Map<String, Integer> bLastStrategy = new HashMap<String, Integer>();
+
     public void revertGamerTargets() {
         aTarget = PlayerTarget.MIN_LOSSES;
         bTarget = PlayerTarget.MAX_PRIZE;
+    }
+
+    public int getAlpha() {
+        List<Integer> minList = new ArrayList<Integer>();
+        for (String rowKey : payMatrix.rowKeySet()) {
+            Map<String, Integer> row = payMatrix.row(rowKey);
+            minList.add(Collections.min(row.values()));
+        }
+        return Collections.max(minList);
+    }
+
+    public int getBeta() {
+        List<Integer> maxList = new ArrayList<Integer>();
+        for (String columnKey : payMatrix.columnKeySet()) {
+            Map<String, Integer> column = payMatrix.column(columnKey);
+            maxList.add(Collections.max(column.values()));
+        }
+        return Collections.min(maxList);
+    }
+
+    public List<Double> getaResult() {
+        return convertToProbability(aResult);
+    }
+
+    public List<Double> getbResult() {
+        return convertToProbability(bResult);
+    }
+
+    public void printaResult() {
+        printResult("A");
+    }
+
+    public void printbResult() {
+        printResult("B");
+    }
+
+    private void printResult(String player) {
+        List<Double> probability;
+        if ("A".equals(player)) {
+            probability = getaResult();
+        } else if ("B".equals(player)) {
+            probability = getbResult();
+        } else {
+            System.out.println("Неизвестный игрок " + player);
+            return;
+        }
+        System.out.println("Частота для " + player);
+        for (int i = 0; i < probability.size(); i++) {
+            System.out.println(player + (i + 1) + " = " + probability.get(i));
+        }
+    }
+
+    private List<Double> convertToProbability(List<Double> result) {
+        List<Double> probability = new ArrayList<Double>();
+        for (Double res : result) {
+            probability.add(res / (double) tourCount);
+        }
+        return probability;
     }
 
     public void addToPayMatrix(int row, int column, int value) {
@@ -54,65 +119,109 @@ public class BrawnMethod {
         System.out.println("|");
 
         for (Integer rowKey : gameTable.rowKeySet()) {
+            int i = 0;
             System.out.printf("|%8d", rowKey);
             for (Double value : gameTable.row(rowKey).values()) {
-                System.out.printf("|%8.2f", value);
+                if (i != 0 && i != 6) {
+                    System.out.printf("|%8.2f", value);
+                } else {
+                    System.out.printf("|%8.0f", value);
+                }
+                i++;
             }
             System.out.println("|");
         }
     }
 
-    public void play(int tourCount) {
+    private void fillListToZero(List<Double> list, int size) {
+        for (int i = 0; i < size; i++) {
+            list.add(0.0);
+        }
+    }
+
+    public void play(int tourCount) throws Exception {
+        fillListToZero(aResult, payMatrix.rowKeySet().size());
+        fillListToZero(bResult, payMatrix.columnKeySet().size());
+        deleteDominatedStrategies();
+        printPayTable();
         String aStrategy = getFirstStrategy();
         currentTurn = 0;
         currIteration = 1;
-        turn(aStrategy, tourCount);
-    }
-
-    private void turn(String strategy, int tourCount) {
-        if (currentTurn < tourCount * 2) {
-            String bestStrategy;
-            if (currentTurn % 2 == 0) {
-                Map<String, Integer> row = payMatrix.row(strategy);
-                bestStrategy = getBestStrategy(row, bTarget);
-                addRowToGameTable(strategy, bestStrategy);
-                currIteration++;
-            } else {
-                Map<String, Integer> column = payMatrix.column(strategy);
-                bestStrategy = getBestStrategy(column, aTarget);
-            }
-            currentTurn++;
-            turn(bestStrategy, tourCount);
+        this.tourCount = tourCount;
+        String bestStrategy = aStrategy;
+        for (int i = 0; i < tourCount * 2; i++) {
+            bestStrategy = turn(bestStrategy);
         }
     }
 
-    private void addRowToGameTable(String a_Strategy, String b_Strategy) {
-        gameTable.put(currIteration, "i", Double.valueOf(a_Strategy.substring(1))); // номер стратегии А
+    private String turn(String strategy) {
+        String bestStrategy;
+        if (currentTurn % 2 == 0) {
+            addAToGameTable(strategy);
+            Map<String, Integer> row;
+            if (currentTurn == 0) {
+                row = payMatrix.row(strategy);
+            } else {
+                row = aLastStrategy;
+            }
+            bestStrategy = getBestStrategy(row, bTarget);
+        } else {
+            addBToGameTable(strategy);
+            Map<String, Integer> column;
+            if (currentTurn == 1) {
+                column = payMatrix.column(strategy);
+            } else {
+                column = bLastStrategy;
+            }
+            bestStrategy = getBestStrategy(column, aTarget);
+            addVToGameTableByLastIteration();
+            currIteration++;
+        }
+        currentTurn++;
+        return bestStrategy;
+    }
 
-        Map<String, Integer> row = payMatrix.row(a_Strategy);
+    private void addAToGameTable(String aStrategy) {
+        String strategyNumber = aStrategy.substring(1);
+        gameTable.put(currIteration, "i", Double.valueOf(strategyNumber)); // номер стратегии А
+        aResult.set(Integer.parseInt(strategyNumber) - 1, aResult.get(Integer.parseInt(strategyNumber) - 1) + 1);
+
+        Map<String, Integer> row = payMatrix.row(aStrategy);
         List<Integer> lastStrategyPay = new ArrayList<Integer>();
         for (Map.Entry<String, Integer> entry : row.entrySet()) { //стратегии B
-            lastStrategyPay.add(fillStrategy(entry));
+            int e = fillStrategy(entry);//
+            lastStrategyPay.add(e);
+            aLastStrategy.put(entry.getKey(), e);
         }
-
         Integer min = Collections.min(lastStrategyPay);
         double v_min = (double) min / currIteration;
         gameTable.put(currIteration, "v_min(n)", v_min); // v min
+    }
 
-        gameTable.put(currIteration, "j", Double.valueOf(b_Strategy.substring(1))); // номер стратегии В
+    private void addBToGameTable(String bStrategy) {
+        String strategyNumber = bStrategy.substring(1);
+        gameTable.put(currIteration, "j", Double.valueOf(strategyNumber)); // номер стратегии В
+        bResult.set(Integer.parseInt(strategyNumber) - 1, bResult.get(Integer.parseInt(strategyNumber) - 1) + 1);
 
-        lastStrategyPay.clear();
-        Map<String, Integer> column = payMatrix.column(b_Strategy);
+        Map<String, Integer> column = payMatrix.column(bStrategy);
+        List<Integer> lastStrategyPay = new ArrayList<Integer>();
         for (Map.Entry<String, Integer> entry : column.entrySet()) { //стратегии B
-            lastStrategyPay.add(fillStrategy(entry));
+            int e = fillStrategy(entry);
+            lastStrategyPay.add(e);
+            bLastStrategy.put(entry.getKey(), e);
         }
 
         Integer max = Collections.max(lastStrategyPay);
         double v_max = (double) max / currIteration;
         gameTable.put(currIteration, "v_max(n)", v_max); // v max
-        gameTable.put(currIteration, "v(n)", (v_max - v_min) / 2); // v(n)
-
     }
+
+    private void addVToGameTableByLastIteration() {
+        double v_max = gameTable.row(currIteration).get("v_max(n)");
+        double v_min = gameTable.row(currIteration).get("v_min(n)");
+        gameTable.put(currIteration, "v(n)", (v_max + v_min) / 2); // v(n)
+    }
+
 
     private int fillStrategy(Map.Entry<String, Integer> entry) {
         int value;
@@ -166,7 +275,7 @@ public class BrawnMethod {
     }
 
 
-    public void deleteDominatedStrategies() throws Exception {
+    private void deleteDominatedStrategies() throws Exception {
         boolean removed;
         do {
             removed = deleteDominatedRows(aTarget);

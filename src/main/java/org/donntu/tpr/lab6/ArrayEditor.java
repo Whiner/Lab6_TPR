@@ -19,5 +19,4 @@ public class ArrayEditor {
         }
         return integers;
     }
-
 }
